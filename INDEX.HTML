@@ -185,7 +185,7 @@ async function checkPrices(){
 
   priceBox.innerText="בודק...";
 
-  const res = await fetch("https://YOUR-SERVER.onrender.com/price",{
+  const res = await fetch("https://family-app-2.onrender.com",{
     method:"POST",
     headers:{"Content-Type":"application/json"},
     body: JSON.stringify({items:shoppingCache})
