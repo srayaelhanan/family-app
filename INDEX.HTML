@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="he">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Family Manager PRO</title>
+
+<!-- ✅ Firebase -->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+
+<style>
+body {font-family:Arial;margin:0;background:#f5f5f5;}
+header {background:#4F46E5;color:white;text-align:center;padding:15px;}
+.container {padding:10px;}
+.card {background:white;margin-bottom:10px;padding:15px;border-radius:12px;}
+
+input,button {width:100%;padding:10px;margin-top:5px;}
+button {background:#4F46E5;color:white;border:none;}
+
+li {
+  margin-top:5px;
+  padding:8px;
+  background:#eee;
+  border-radius:8px;
+  display:flex;
+  justify-content:space-between;
+}
+.done {text-decoration:line-through;}
+small {color:#666;}
+</style>
+</head>
+
+<body>
+
+<header>
+🏠 Family Manager
+<div id="userName"></div>
+</header>
+
+<div class="container">
+
+<div class="card">
+<h3>🛒 קניות</h3>
+<input id="itemInput" placeholder="מוצר">
+<input id="qtyInput" placeholder="כמות">
+<button onclick="addItem()">הוסף</button>
+<ul id="shoppingList"></ul>
+</div>
+
+<div class="card">
+<h3>✅ משימות</h3>
+<input id="taskInput" placeholder="משימה">
+<button onclick="addTask()">הוסף</button>
+<ul id="taskList"></ul>
+</div>
+
+<div class="card">
+<h3>💰 מחירים</h3>
+<button onclick="checkPrices()">בדוק איפה הכי זול</button>
+<div id="priceBox"></div>
+</div>
+
+</div>
+
+<script>
+
+// ✅ Firebase config (שים שלך!)
+const firebaseConfig = {
+  apiKey: "AIzaSyC56wdYmTIxjuTQRxtsqLuAf3V2K0TMe7s",
+  authDomain: "family-manager-app-63988.firebaseapp.com",
+  projectId: "family-manager-app-63988",
+  storageBucket: "family-manager-app-63988.firebasestorage.app",
+  messagingSenderId: "75265212906",
+  appId: "1:75265212906:web:aa49d825052255ce333293",
+  measurementId: "G-CYSG2MRJTV"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+// ✅ משתמש
+let username = "User";
+const provider = new firebase.auth.GoogleAuthProvider();
+
+firebase.auth().onAuthStateChanged(user=>{
+  if(user){
+    username = user.displayName;
+    userName.innerText = username;
+  } else {
+    firebase.auth().signInWithPopup(provider);
+  }
+});
+
+// ✅ משפחה
+let family = localStorage.getItem("family");
+if(!family){
+  family = prompt("שם משפחה:");
+  localStorage.setItem("family", family);
+}
+
+// ✅ cache
+window.shoppingCache = [];
+
+// ✅ הוספת מוצר
+function addItem(){
+  let name = itemInput.value;
+  let qty = qtyInput.value || "1";
+  if(!name) return;
+
+  db.collection("families").doc(family)
+    .collection("shopping")
+    .add({ name, qty, user: username });
+
+  itemInput.value="";
+  qtyInput.value="";
+}
+
+// ✅ הוספת משימה
+function addTask(){
+  let val = taskInput.value;
+  if(!val) return;
+
+  db.collection("families").doc(family)
+    .collection("tasks")
+    .add({ name: val, done: false });
+
+  taskInput.value="";
+}
+
+// ✅ סימון משימה
+function toggleTask(id,done){
+  db.collection("families").doc(family)
+    .collection("tasks").doc(id)
+    .update({done: !done});
+}
+
+// ✅ הוספה ליומן
+function addToCalendar(task){
+  let start = new Date().toISOString().replace(/-|:|\.\d+/g, "");
+  let url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${task}&dates=${start}/${start}`;
+  window.open(url);
+}
+
+// ✅ קניות realtime
+db.collection("families").doc(family)
+.collection("shopping")
+.onSnapshot(snapshot=>{
+
+  shoppingList.innerHTML="";
+  shoppingCache=[];
+
+  snapshot.forEach(doc=>{
+    let d = doc.data();
+    shoppingCache.push(d);
+
+    shoppingList.innerHTML += `
+      <li>
+        ${d.name} x${d.qty}
+      </li>`;
+  });
+});
+
+// ✅ משימות realtime
+db.collection("families").doc(family)
+.collection("tasks")
+.onSnapshot(snapshot=>{
+
+  taskList.innerHTML="";
+
+  snapshot.forEach(doc=>{
+    let d = doc.data();
+
+    taskList.innerHTML += `
+      <li class="${d.done?'done':''}">
+        <span onclick="toggleTask('${doc.id}',${d.done})">${d.name}</span>
+        <button onclick="addToCalendar('${d.name}')">📅</button>
+      </li>`;
+  });
+});
+
+// ✅ בדיקת מחירים
+async function checkPrices(){
+
+  priceBox.innerText="בודק...";
+
+  const res = await fetch("https://YOUR-SERVER.onrender.com/price",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({items:shoppingCache})
+  });
+
+  const data = await res.json();
+
+  let html="";
+  data.forEach(p=>{
+    html += `<div>${p.name} - ₪${p.price} (${p.store})</div>`;
+  });
+
+  priceBox.innerHTML = html;
+}
+
+</script>
+
+</body>
+</html>
